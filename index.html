@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <script src="https://momentjs.com/downloads/moment.js"></script>
+        <style>
+            @font-face {
+                font-family: 'ITC Avant Garde Gothic Std Book';
+                font-style: normal;
+                font-weight: normal;
+                src: local('ITC Avant Garde Gothic Std Book'), url('fonts/ITCAvantGardeStdBk.woff') format('woff'); 
+            }
+            @font-face {
+                font-family: 'ITC Avant Garde Gothic Std Medium';
+                font-style: normal;
+                font-weight: normal;
+                src: local('ITC Avant Garde Gothic Std Medium'), url('fonts/ITCAvantGardeStd-Md_MOD.woff') format('woff');
+            }
+            @font-face {
+                font-family: 'ITC Avant Garde Gothic Std Bold';
+                font-style: normal;
+                font-weight: normal;
+                src: local('ITC Avant Garde Gothic Std Bold'), url('fonts/ITCAvantGardeStdBold.woff') format('woff');
+            }
+            @font-face {
+                font-family: 'ITC Avant Garde Gothic Std Bold Condensed';
+                font-style: normal;
+                font-weight: normal;
+                src: local('ITC Avant Garde Gothic Std Bold Condensed'), url('fonts/ITCAvantGardeStdBoldCn.woff') format('woff');
+            }
+            @font-face {
+                font-family: 'ITC Avant Garde Gothic Std Medium Condensed';
+                font-style: normal;
+                font-weight: normal;
+                src: local('ITC Avant Garde Gothic Std Medium Condensed'), url('fonts/ITCAvantGardeStdMdCn.woff') format('woff');
+            }
+            text{
+                font-size: 16px;
+                font-family: 'ITC Avant Garde Gothic Std Book';
+            }
+            text.title{
+                font-size: 48px;
+                font-weight: 700;
+                font-family: "ITC Avant Garde Gothic Std Bold";
+                fill: #005243;
+            }
+            text.subtitle{
+                font-weight: 500;
+                font-size: 20px;
+                fill: #777777;
+            }
+            text.caption{
+                font-weight: 400;
+                font-size: 30px;
+                fill: #777777;
+                font-family: "ITC Avant Garde Gothic Std Medium";
+            }
+            text.label{
+                font-size: 40px;
+                font-family: "ITC Avant Garde Gothic Std Medium";
+            }
+            text.z_label {
+                font-size: 45px;
+                font-family: "ITC Avant Garde Gothic Std Medium";
+            }
+            text.cc_label {
+                font-size: 20px;
+                font-family: "ITC Avant Garde Gothic Std Medium Condensed";
+                font-weight: 600;
+            }
+            text.c_label {
+                font-size: 40px;
+                font-family: 'ITC Avant Garde Gothic Std Medium';
+                opacity: 0.45;
+            }
+
+            text.p_label {
+                font-size: 28px;
+                font-family: "ITC Avant Garde Gothic Std Bold Condensed";
+                font-weight: 500;
+            }
+
+            text.valueLabel{
+                font-size: 40px;
+                font-weight: 600;
+                fill: #000000;
+            }
+
+            text.dateText{
+                font-size: 64px;
+                font-weight: 700;
+                fill: #777777;
+                font-family: 'ITC Avant Garde Gothic Std Medium';
+            }
+
+            text.rankText {
+                font-size: 150px;
+                font-weight: 700;
+                opacity: 0.50;
+            }
+
+            text.sub_caption {
+                font-size: 24px;
+                font-weight: 900;
+            }
+            .tick text {
+                fill: #777777;
+                font-size: 20px;
+            }
+            .xAxis .tick:nth-child(2) text {
+                text-anchor: start;
+            }
+            .tick line {
+                shape-rendering: CrispEdges;
+                stroke: #dddddd;
+            }
+            .tick line.origin{
+                stroke: #aaaaaa;
+            }
+            path.domain{
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <script>
+            function calculate_age(curr, dob) { 
+                if (dob == "..") {
+                    return "??";
+                }
+                else {
+                    var diff_ms = new Date(curr).getTime() - new Date(dob).getTime();
+                    var age_dt = new Date(diff_ms); 
+                
+                    return Math.abs(age_dt.getUTCFullYear() - 1970);
+                }
+                }
+
+            function calculate_m(curr, yl) {
+                if (yl == null) {
+                    return 0;
+                }
+                else {
+                    return new moment(yl).diff(new moment(curr), 'months');
+                }
+            }
+
+            var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+
+            // top_n
+            const top_n = 10;
+
+            const f_size = 86;
+
+            const p_zone = 360
+
+            let r_player = null;
+            let r_date = null;
+            // dimensions
+            const height = 1080;
+            const width = 1920;
+
+            const speed = 1; // playback speed
+
+            // animation delay (ms)
+            const tickDuration = 200 / speed;
+            const delayDuration = 100 / speed;
+
+            // date start/end
+            const dateStart = "2001-01-01";
+            const dateEnd = "2020-04-01";
+
+            // title/subtitle
+            const title = `ITTF Senior Men\'s Singles Top 10 Ranking ` + 
+            `(1928 to 2020)`;
+            const subtitle = "(ranking points)";
+
+            // make an svg object
+            const svg = d3.select("body").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // margin and padding
+            const margin = {
+                top: 80,
+                right: 60,
+                bottom: 10,
+                left: 60
+            };
+
+            const barPadding = (height - (margin.bottom + margin.top)) / (top_n * 5);
+
+            // add title, subtitle, caption to svg
+            svg.append("text")
+                .attr('class', 'title')
+                .attr('x', margin.left)
+                .attr('y', margin.top - 25)
+                .html(title);
+
+            svg.append("text")
+                .attr('class', 'subtitle')
+                .attr('x', width - margin.right - 120)
+                .style('text-anchor', 'end')
+                .attr('y', 75 + p_zone)
+                .html(subtitle);
+
+            svg.append("text")
+                .attr('class', 'caption')
+                .attr('x', width - margin.right - 120)
+                .attr('y', margin.top - 20)
+                .style('text-anchor', 'end')
+                .html('Source: ITTF');
+
+            svg.append("text")
+                .attr('class', 'sub_caption')
+                .attr('x', margin.left + 410)
+                .attr('y', margin.top + 260)
+                .style('text-anchor', 'middle')
+                .html('months in a row');
+
+            // initiate date
+            let date = dateStart;
+
+            // read CSV and perform
+            d3.csv(`csv_${"en"}/part_${4}.csv`)
+                .then(function(data) {
+                    console.log(data); // output to console all data collected
+
+                    data.forEach(d => {
+                        d.colour = d3.hsl(d["Hue"], 0.75, 0.75);
+                    }); // assign HSL colour attribute to each entry
+
+                    let lastValues = {}; // last values
+
+                    function _normalizeData() {
+                        const values = {}; // values
+                        const ret = []; // ret ??
+                        
+                        data.forEach(d => {
+                            const name = d["Name"]; // grab name
+                            const country = d["Country"];
+                            const flag = d["Country Flag"];
+                            let pic = `player/${d["Picture"]}`;
+                            if (d["Picture"] == 0) pic = "player/UNKNOWN.jpg";
+                            const dob = d["DOB"];
+                            const id = d["ID"];
+                            const country_n = d["Country Name"];
+
+                            let val = parseFloat(d[date]); // grab value by (current) date
+                            
+                            let lastValue = lastValues[id];
+                            if (lastValue == null) lastValue = 0;
+
+                            ret.push({
+                                id        : id,
+                                name      : name,     // name attribute
+                                dob       : dob,
+                                pic       : pic,
+                                country   : country,
+                                country_n : country_n,
+                                flag      : flag,
+                                colour    : d.colour, // colour attribute
+                                value     : val,      // value attribute
+                                lastValue : lastValue // last value attribute
+                            }); // push attributes to ret ??
+
+                            values[id] = val; // remember current value of player
+                        }); // prepares data into values
+
+                        lastValues = values; // overwrite ??
+
+                        return ret.sort((a, b) => b.value - a.value).slice(0, top_n); // sort values/slice at top_n position
+                    }
+
+                    let dateSlice = _normalizeData(); // perform the above function and get current top_n
+
+                    dateSlice.forEach((d, i) => d.rank = i); // assign rank number i to each entry of dateSlice
+
+                    console.log('dateSlice: ', dateSlice); // output to console current slice
+
+                    let x = d3.scaleLinear() // define x units (points), DOMAIN and RANGE
+                        .domain([0, d3.max(dateSlice, d => d.value)]) // x-axis DOMAIN (zero to max)
+                        .range([margin.left + 60, width - margin.right - 465]); // x-axis RANGE (according to margin)
+
+                    let y = d3.scaleLinear() // define y units (ranking), DOMAIN and RANGE
+                        .domain([top_n, 0]) // y-axis DOMAIN (from the defined top_n to zero) ??
+                        .range([height - p_zone - margin.bottom, margin.top]); // y-axis RANGE (according to margin)
+
+                    let xAxis = d3.axisTop() // define time x-axis
+                        .scale(x) // scale is by x units
+                        .ticks(width > 500 ? 5 : 2) // x units (points) major gridlines
+                        .tickSize(-(height - margin.top - p_zone - margin.bottom)) // gridline size
+                        .tickFormat(d => d3.format(',')(d)); // ??
+
+                    svg.append('g') // draw the grid
+                        .attr('class', 'axis xAxis')
+                        .attr('transform', `translate(0, ${margin.top + p_zone})`)
+                        .call(xAxis)
+                        .selectAll('.tick line')
+                        .classed('origin', d => d == 0);
+
+                    svg.selectAll('text.r_label')
+                        .data(dateSlice, d => d.id)
+                        .enter()
+                        .append('text')
+                        .attr('class', 'z_label')
+                        .attr('x', 95)
+                        .attr('y', d => margin.top + 410 + d.rank * 63)
+                        .style('text-anchor', 'end')
+                        .html(d => `${d.rank + 1}`);
+
+                    svg.selectAll('rect.bar') // bar
+                        .data(dateSlice, d => d.id)
+                        .enter()
+                        .append('rect')
+                        .attr('class', 'bar')
+                        .attr('x', x(0) + 1)
+                        .attr('width', d => x(d.lastValue) - x(0))
+                        .attr('y', d => y(d.rank) + 5 + p_zone)
+                        .attr('height', y(1) - y(0) - barPadding + 11)
+                        .style('fill', d => d.colour);
+
+                    svg.selectAll('text.label') // name label
+                        .data(dateSlice, d => d.id)
+                        .enter()
+                        .append('text')
+                        .attr('class', 'label')
+                        .attr('x', d => x(d.lastValue) - 8)
+                        .attr('y', d => y(d.rank) + ((y(1) - y(0)) / 2) + p_zone + 15)
+                        .style('text-anchor', 'end')
+                        .html(d => `${d.name} (${calculate_age(date, d.dob)})`);
+
+                    svg.selectAll('text.c_label') // country label
+                        .data(dateSlice, d => d.id)
+                        .enter()
+                        .append('text')
+                        .attr('class', 'c_label')
+                        .attr('x', d => x(d.lastValue) - 4)
+                        .attr('y', d => y(d.rank) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone)
+                        .style('text-anchor', 'end')
+                        .html(d => d.country); 
+                   
+                    svg.selectAll('text.valueLabel') // points label
+                        .data(dateSlice, d => d.id)
+                        .enter()
+                        .append('text')
+                        .attr('class', 'valueLabel')
+                        .attr('x', d => x(d.lastValue) + 5)
+                        .attr('y', d => y(d.rank) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone)
+                        .text(d => d.lastValue.toFixed(0));
+
+                    let dateText = svg.append('text') // current date text
+                        .attr('class', 'dateText')
+                        .attr('x', width - margin.right - 80)
+                        .attr('y', height - 50)
+                        .style('text-anchor', 'end')
+                        .html(date);
+
+                    let rankText = svg.append('text')
+                        .attr('class', 'rankText')
+                        .attr('x', margin.left + 410)
+                        .attr('y', margin.top + 210)
+                        .style('text-anchor', 'middle')
+                        .html(calculate_m(date, r_date));
+                    
+                    let r2Text = svg.append("text")
+                        .attr('class', 'sub_caption')
+                        .attr('x', margin.left + 410)
+                        .attr('y', margin.top + 60)
+                        .style('text-anchor', 'middle')
+                        .html((new moment(date) >= new moment("2001-01-01") ? 'ranked #1 for': "unofficially #1 for"));
+
+                    let ticker = d3.interval(e => {
+                        dateSlice = _normalizeData(); // prep data ??
+                        dateSlice.forEach((d,i) => d.rank = i); // rank each top_n ??
+                        x.domain([0, d3.max(dateSlice, d => d.value)]); // set domain of points
+
+                        svg.select('.xAxis')
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .call(xAxis);
+
+                        const bars = svg.selectAll('.bar').data(dateSlice, d => d.id);
+
+                        bars // bar enter transition ??
+                            .enter()
+                            .append('rect')
+                            .attr('class', d => `bar ${d.id}`)
+                            .attr('x', x(0) + 1)
+                            .attr('width', d => x(d.value) - x(0))
+                            .attr('y', d => y(top_n + 1) + 5 + p_zone)
+                            .attr('height', y(1) - y(0) - barPadding + 11)
+                            .style('fill', d => d.colour)
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('y', d => y(d.rank) + 5 + p_zone)
+
+                        bars
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('width', d => Math.max(0, x(d.value) - x(0)))
+                            .attr('y', d => y(d.rank) + 5 + p_zone);
+
+                        bars // bar exit transition ??
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('width', d => Math.max(0, x(d.value) - x(0)))
+                            .attr('y', d => y(top_n + 1) + 5 + p_zone)
+                            .remove();
+
+                        const labels = svg.selectAll('.label')
+                            .data(dateSlice, d => d.id);
+
+                        labels // name label enter transition ??
+                            .enter()
+                            .append('text')
+                            .attr('class', 'label')
+                            .attr('x', d => x(d.value) - 70 - f_size - 40)
+                            .attr('y', d => y(top_n + 1) + ((y(1) - y(0)) / 2) + p_zone + 15)
+                            .style('text-anchor', 'end')
+                            .html(d => `${d.name} (${calculate_age(date, d.dob)})`)    
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('y', d => y(d.rank) + ((y(1) - y(0)) / 2) + p_zone + 15);
+
+
+                        labels
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) - 70 - f_size - 40)
+                            .attr('y', d => y(d.rank) + ((y(1) - y(0)) / 2) + p_zone + 15);
+
+                        labels // name label exit transition ??
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) - 70 - f_size - 40)
+                            .attr('y', d => y(top_n + 1) + 5 + p_zone)
+                            .remove();
+
+                        const p_labels = svg.selectAll('.p_label')
+                            .data(dateSlice.slice(0, 5), d => d.id)
+
+                        p_labels
+                            .enter()
+                            .append('text')
+                            .attr('class', 'p_label')
+                            .attr('x', d => (5 + 3) * 280 + margin.left)
+                            .attr('y', margin.top + 307)
+                            .html(d => `${d.rank + 1}. ${d.name}`)
+                            .style('text-anchor', 'middle')
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => (d.rank + (d.rank != 0 ? 1 : 0)) * 280 + margin.left + 140);
+
+                        p_labels
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => (d.rank + (d.rank != 0 ? 1 : 0)) * 280 + margin.left + 140);
+
+                        p_labels
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', (5 + 3) * 280 + margin.left)
+                            .remove();
+
+                        const cc_labels = svg.selectAll('.cc_label')
+                            .data(dateSlice.slice(0, 5), d => d.id)
+
+                        cc_labels
+                            .enter()
+                            .append('text')
+                            .attr('class', 'cc_label')
+                            .attr('x', d => (5 + 3) * 280 + margin.left)
+                            .attr('y', margin.top + 330)
+                            .html(d => `${d.country_n}`)
+                            .style('text-anchor', 'middle')
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => (d.rank + (d.rank != 0 ? 1 : 0)) * 280 + margin.left + 140);
+
+                        cc_labels
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => (d.rank + (d.rank != 0 ? 1 : 0)) * 280 + margin.left + 140);
+
+                        cc_labels
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', (5 + 3) * 280 + margin.left)
+                            .remove();
+
+                        const c_labels = svg.selectAll('.c_label')
+                            .data(dateSlice, d => d.id);
+
+                        c_labels // country label enter transition ??
+                            .enter()
+                            .append('text')
+                            .attr('class', 'c_label')
+                            .attr('x', d => x(d.value) - 4)
+                            .attr('y', d => y(top_n + 1) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone)
+                            .style('text-anchor', 'end')
+                            .html(d => d.country)    
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('y', d => y(d.rank) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone);
+
+
+                        c_labels
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) - f_size - 4)
+                            .attr('y', d => y(d.rank) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone);
+
+                        c_labels // country label exit transition ??
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) - f_size - 4)
+                            .attr('y', d => y(top_n + 1) + 5 + p_zone)
+                            .remove();
+                        
+                        const flagImages = svg.selectAll('.f_image').data(dateSlice, d => d.id);
+
+                        flagImages // enter
+                            .enter()
+                            .append('image')
+                            .attr('class', 'f_image')
+                            .attr('x', d => x(d.value) - f_size + 4)
+                            .attr('y', d => y(top_n + 1) + 0 + ((y(1) - y(0)) / 2) - 11 + p_zone)
+                            .attr('xlink:href', d => d.flag)
+                            .attr('width', f_size)
+                            .attr('height', f_size)
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('y', d => y(d.rank) + 0 - 11+ p_zone)
+
+                        flagImages
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) - f_size + 4)
+                            .attr('y', d => y(d.rank) + 0 -11 + p_zone)
+
+
+                        flagImages // exit
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) - f_size + 4)
+                            .attr('y', d => y(top_n + 1) + 0 -11+ p_zone)
+                            .remove();
+
+                        const playerImages = svg.selectAll('.p_image').data(dateSlice.slice(0, 5), d => d.id);
+
+                        playerImages
+                            .enter()
+                            .append('image')
+                            .attr('class', 'p_image')
+                            .attr('x', d => (5 + 2) * 280 + margin.left)
+                            .attr('y', margin.top)
+                            .attr('xlink:href', d => d.pic)
+                            .attr('width', 280)
+                            .attr('height', 280)
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => (d.rank + (d.rank != 0 ? 1 : 0)) * 280 + margin.left);
+
+                        playerImages
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => (d.rank + (d.rank != 0 ? 1 : 0)) * 280 + margin.left);
+
+                        playerImages
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', (5 + 2) * 280 + margin.left)
+                            .remove();
+
+                        const valueLabels = svg.selectAll('.valueLabel').data(dateSlice, d => d.id);
+
+                        valueLabels // value label enter transition ??
+                            .enter()
+                            .append('text')
+                            .attr('class', 'valueLabel')
+                            .attr('x', d => x(d.value) + 10)
+                            .attr('y', d => y(top_n + 1) + 5 + p_zone)
+                            .text(d => d.value.toFixed(0))
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('y', d => y(d.rank) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone);
+
+                        valueLabels
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) + 10)
+                            .attr('y', d => y(d.rank) + 5 + ((y(1) - y(0)) / 2) + 10 + p_zone)
+                            .tween("text", function(d) {
+                                const i = d3.interpolateNumber(d.lastValue, d.value);
+                                return function(t) {
+                                let v = i(t);
+                                if( v < 0 )
+                                    v = 0;
+                                this.textContent = v.toFixed(0);
+                                };
+                            });
+
+                        valueLabels // value label exit transition ??
+                            .exit()
+                            .transition()
+                            .duration(tickDuration)
+                            .ease(d3.easeLinear)
+                            .attr('x', d => x(d.value) + 10)
+                            .attr('y', d => y(top_n + 1) + 10 + p_zone)
+                            .remove();
+                        
+                        if (new moment(date) == new moment(dateEnd)) {
+                            ticker.stop();
+                        }
+
+                        
+                        let d_conv = moment(date);
+
+                        s_date = date.split('-');
+                        
+                        if (dateSlice[0].name != r_player) {
+                            r_date = `${new moment(date).add(1, "months").format("YYYY-MM-")}01`;
+                            r_player = dateSlice[0].name;
+                        }
+
+                        rankText.html(calculate_m(r_date, date) + 1);
+                        r2Text.html((new moment(date) >= new moment("2001-01-01") ? 'ranked #1 for': "unofficially #1 for"));
+                        
+                        p_labels.html(d => `${d.rank + 1}. ${d.name}`)
+                        dateText.html(`${months[d_conv.format('M') - 1]} ${d_conv.format('YYYY')}`);
+                        labels.html(d => `${d.name} (${calculate_age(new Date(date), d.dob)})`) // age bracket
+                        date = new moment(d_conv.add(2, 'days')).format()
+                                .split("T")[0];
+                        
+                        if (new moment(date) > new moment(dateEnd)) {
+                            date = dateEnd;
+                        }
+
+                        
+                    }, delayDuration);
+                });
+        </script>
+    </body>
+</html>
